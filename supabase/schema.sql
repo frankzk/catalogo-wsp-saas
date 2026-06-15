@@ -16,7 +16,7 @@ create table if not exists public.merchants (
   id                  uuid primary key default gen_random_uuid(),
   user_id             uuid not null unique references auth.users (id) on delete cascade,
   stripe_customer_id  text unique,
-  plan                text,
+  plan                text not null default 'free',   -- 'free' | 'pro'
   -- Mirrors the Stripe subscription status:
   -- none | trialing | active | past_due | canceled | unpaid | incomplete | incomplete_expired | paused
   subscription_status text not null default 'none',
@@ -189,3 +189,11 @@ drop policy if exists events_select_own on public.events;
 create policy events_select_own on public.events
   for select
   using (store_id in (select id from public.stores where merchant_id = public.current_merchant_id()));
+
+-- -----------------------------------------------------------------------------
+-- MIGRATIONS (idempotent — safe to re-run on existing projects)
+-- -----------------------------------------------------------------------------
+
+-- Freemium model: every merchant starts on the Free plan.
+alter table public.merchants alter column plan set default 'free';
+update public.merchants set plan = 'free' where plan is null;

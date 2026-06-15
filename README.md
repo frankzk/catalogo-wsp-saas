@@ -6,7 +6,7 @@ entrega (COD)**.
 
 - **Frontend + API**: Next.js (App Router) en Vercel
 - **Base de datos + Auth**: Supabase (Postgres + Auth, con Row Level Security)
-- **Cobros**: Stripe Billing (Checkout + Customer Portal + Webhooks): cuota base mensual ($4.90) + $0.10 por pedido generado (uso medido), con prueba de 14 días
+- **Cobros**: Stripe Billing (Checkout + Customer Portal + Webhooks). Modelo **freemium**: plan **Free** (hasta 10 pedidos/mes, sin costo) y plan **Pro** ($4.90/mes, 10 pedidos incluidos + $0.05 por pedido extra)
 - **Integración**: Shopify App público (OAuth) — _Fase 2_
 
 > Este repositorio implementa la **Fase 1** completa: scaffold de Next.js,
@@ -29,7 +29,7 @@ entrega (COD)**.
    - [5. Vercel](#5-vercel)
    - [6. Dominio](#6-dominio)
 5. [Variables de entorno](#variables-de-entorno)
-6. [Cómo funciona el gating](#cómo-funciona-el-gating)
+6. [Cómo funcionan los planes y el gating](#cómo-funcionan-los-planes-y-el-gating)
 7. [Roadmap](#roadmap)
 8. [Notas de seguridad](#notas-de-seguridad)
 
@@ -39,11 +39,11 @@ entrega (COD)**.
 
 - ✅ Registro / login de comercios (Supabase Auth: email + Google)
 - ✅ Creación automática del `merchant` al registrarse (trigger en DB)
-- ✅ Suscripción: cuota base mensual + cargo por uso ($0.10/pedido) con Stripe Checkout + prueba de 14 días
+- ✅ Planes Free / Pro con Stripe Checkout (Pro: $4.90/mes, 10 pedidos incluidos + $0.05 excedente)
 - ✅ Customer Portal de Stripe para gestionar / cancelar
 - ✅ Webhooks de Stripe que sincronizan el estado y **cortan acceso** si no se paga
 - ✅ Esquema Postgres completo (`merchants`, `stores`, `store_configs`, `orders`, `events`) con **Row Level Security**
-- ✅ Middleware de _gating_: el dashboard exige suscripción activa / en prueba
+- ✅ Middleware: el dashboard requiere autenticación (Free y Pro tienen acceso completo)
 - ✅ Cifrado AES-256-GCM listo para los tokens (Shopify / Telegram)
 - ✅ Páginas de marketing, Política de Privacidad y Términos
 - ✅ Compila y despliega sin configuración previa (las claves se validan en tiempo de petición)
@@ -140,24 +140,26 @@ rellenar**.
 
 ### 2. Stripe
 
-El modelo de cobro es **híbrido**: una cuota base fija + un cargo por uso
-(metered) por cada pedido generado.
+El modelo es **freemium**: el plan **Free** no requiere pago (tope de 10
+pedidos/mes, controlado en la app). El plan **Pro** se cobra con Stripe: una
+cuota base fija + un excedente por pedido a partir del #11. Solo configuras Pro
+en Stripe.
 
 1. Crea tu cuenta en <https://stripe.com> (puedes empezar en **modo test**).
-2. **Precio base (cuota fija)**: **Product catalog → Add product**. Crea un
-   precio **recurrente mensual** de **$4.90/mes**. Copia el **Price ID**
+2. **Precio base de Pro (cuota fija)**: **Product catalog → Add product**. Crea
+   un precio **recurrente mensual** de **$4.90/mes**. Copia el **Price ID**
    (`price_…`) → `STRIPE_PRICE_ID`.
-3. **Cobro por pedido (uso medido)**:
+3. **Excedente por pedido (uso medido, escalonado)**:
    - **Billing → Meters → Create meter**. En _Event name_ pon `order_generated`
      (debe coincidir con `STRIPE_USAGE_METER_EVENT`) y agregación **Sum**.
-   - Crea un **precio medido** (metered) vinculado a ese meter, de **$0.10 por
-     unidad** (puede ir dentro del mismo producto). Copia su **Price ID** →
-     `STRIPE_USAGE_PRICE_ID`.
-   - _(Opcional)_ ¿Quieres incluir un cupo gratis (p. ej. los primeros 50
-     pedidos del mes sin costo)? Usa **precios escalonados (tiered)** en ese
-     precio: primer tramo hasta _N_ a $0 y el resto a $0.10. El código no
-     cambia: siempre reporta 1 evento por pedido y Stripe aplica los tramos.
-   - Para desactivar el cobro por pedido, deja `STRIPE_USAGE_PRICE_ID` vacío.
+   - Crea un **precio medido (metered) escalonado** (_graduated/tiered_)
+     vinculado a ese meter: **primer tramo hasta 10 unidades a $0** y **el resto
+     a $0.05 por unidad**. Copia su **Price ID** → `STRIPE_USAGE_PRICE_ID`.
+   - Así Stripe aplica solo, por cada cliente Pro, los 10 pedidos incluidos y
+     cobra $0.05 desde el #11. El código reporta 1 evento por pedido; Stripe
+     hace el cálculo de los tramos.
+   - Si prefieres un Pro sin excedente (todo incluido), deja
+     `STRIPE_USAGE_PRICE_ID` vacío.
 4. **API key**: **Developers → API keys** → copia la **Secret key**
    (`sk_test_…`) → `STRIPE_SECRET_KEY`.
 5. **Customer Portal**: **Settings → Billing → Customer portal** → actívalo y
@@ -175,7 +177,8 @@ El modelo de cobro es **híbrido**: una cuota base fija + un cargo por uso
 7. Define también:
    - `STRIPE_PORTAL_RETURN_URL` = `http://localhost:3000/dashboard/billing`
      (o tu dominio en prod)
-   - `STRIPE_TRIAL_DAYS` = `14`
+   - `STRIPE_TRIAL_DAYS` = `0` (el plan Free ya es la entrada; pon `14` si
+     además quieres ofrecer prueba de Pro)
 
 **Webhooks en local** (con la [Stripe CLI](https://stripe.com/docs/stripe-cli)):
 
@@ -239,7 +242,7 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → API | **secreto**, solo servidor |
 | `STRIPE_SECRET_KEY` | Stripe → API keys | `sk_test_…` / `sk_live_…` |
 | `STRIPE_PRICE_ID` | Stripe → Precio base | `price_…` (cuota fija $4.90/mes) |
-| `STRIPE_USAGE_PRICE_ID` | Stripe → Precio medido | `price_…` ($0.10/pedido; vacío = sin cobro por uso) |
+| `STRIPE_USAGE_PRICE_ID` | Stripe → Precio medido | `price_…` (escalonado: 10 a $0, luego $0.05; vacío = sin excedente) |
 | `STRIPE_USAGE_METER_EVENT` | Stripe → Meter | nombre del evento (`order_generated`) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe → Webhooks / CLI | `whsec_…` |
 | `STRIPE_PORTAL_RETURN_URL` | Tú | regreso del portal |
@@ -255,25 +258,25 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 
 ---
 
-## Cómo funciona el gating
+## Cómo funcionan los planes y el gating
 
-- Al registrarse, un **trigger** crea el `merchant` con `subscription_status = 'none'`.
-- El **middleware** protege `/dashboard/*`:
-  - sin sesión → redirige a `/login`;
-  - con sesión pero **sin** suscripción `active`/`trialing` → redirige a
-    `/dashboard/billing` (única ruta del dashboard siempre accesible).
-- En `/dashboard/billing` el comercio inicia el **Checkout** (con prueba de 14
-  días). Al volver, `/api/stripe/checkout/success` sincroniza la suscripción de
-  inmediato (sin esperar al webhook).
-- Los **webhooks** mantienen el estado al día: renovaciones, fallos de pago y
-  cancelaciones. Los estados `past_due` / `unpaid` / `canceled` **cortan el
-  acceso**.
-- El **cargo por uso** ($0.10/pedido) se reportará a Stripe al generar cada
-  pedido (Fase 3) mediante _meter events_ (`reportOrderUsage` en
-  `src/lib/billing.ts`); Stripe lo factura junto con la cuota base.
-- El catálogo público (_Fase 3_) seguirá sirviéndose; si la suscripción está
-  vencida, se podrá desactivar el checkout (campo
-  `store_configs.disable_checkout_when_unpaid`).
+- Al registrarse, un **trigger** crea el `merchant` en el plan **Free**
+  (`subscription_status = 'none'`, `plan = 'free'`).
+- El **middleware** solo exige **autenticación** para `/dashboard/*` (sin
+  sesión → `/login`). Free y Pro tienen acceso completo al panel.
+- Para pasar a **Pro**, el comercio inicia el **Checkout** desde
+  `/dashboard/billing`. Al volver, `/api/stripe/checkout/success` sincroniza el
+  estado de inmediato (sin esperar al webhook).
+- Los **webhooks** mantienen el estado al día (renovaciones, fallos de pago,
+  cancelaciones). Al cancelar o impagar (`past_due` / `unpaid` / `canceled`), el
+  comercio **vuelve a Free** (`plan = 'free'`).
+- **Tope del plan Free**: máximo 10 pedidos/mes. Se cuenta por mes en la app y,
+  al alcanzarlo, se desactiva el checkout del catálogo hasta el próximo mes o
+  hasta pasar a Pro (campo `store_configs.disable_checkout_when_unpaid`; se
+  aplica en Fase 3).
+- **Excedente Pro**: cada pedido generado en Shopify se reporta a Stripe
+  (`reportOrderUsage` en `src/lib/billing.ts`); el precio medido escalonado
+  aplica los 10 incluidos y cobra $0.05 desde el pedido #11.
 
 ---
 

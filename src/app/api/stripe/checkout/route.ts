@@ -51,8 +51,8 @@ export async function POST() {
   const priceId = requireEnv(env.stripePriceId, "STRIPE_PRICE_ID");
   const trialDays = env.stripeTrialDays;
 
-  // Base flat plan ($4.90/mo) + optional metered per-order price ($0.10/order).
-  // Metered prices must NOT include a quantity.
+  // Pro base plan ($4.90/mo) + optional metered overage price (tiered: first 10
+  // orders $0, then $0.05/order). Metered prices must NOT include a quantity.
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
     { price: priceId, quantity: 1 },
   ];

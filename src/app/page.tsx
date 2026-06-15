@@ -1,4 +1,11 @@
 import Link from "next/link";
+import {
+  FREE_ORDER_LIMIT,
+  PRO_INCLUDED_ORDERS,
+  PRO_OVERAGE_RATE,
+  PRO_PRICE_MONTHLY,
+  formatUsd,
+} from "@/lib/plans";
 
 const FEATURES = [
   {
@@ -54,7 +61,7 @@ export default function MarketingPage() {
       <main className="flex-1">
         <section className="mx-auto max-w-6xl px-6 py-20 text-center">
           <p className="mb-3 inline-block rounded-full bg-whatsapp-light px-3 py-1 text-sm font-medium text-whatsapp-teal">
-            Prueba gratis 14 días · sin tarjeta para empezar a configurar
+            Empieza gratis · hasta {FREE_ORDER_LIMIT} pedidos al mes · sin tarjeta
           </p>
           <h1 className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight sm:text-5xl">
             Tu tienda Shopify como un{" "}
@@ -102,40 +109,85 @@ export default function MarketingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="py-20">
-          <div className="mx-auto max-w-md px-6 text-center">
-            <h2 className="text-3xl font-bold">Un plan, todo incluido</h2>
-            <div className="mt-8 rounded-2xl border-2 border-whatsapp p-8 shadow-sm">
-              <p className="text-sm font-medium uppercase tracking-wide text-whatsapp-teal">
-                Plan Pro
-              </p>
-              <p className="mt-4 text-5xl font-extrabold">
-                $4.90
-                <span className="text-lg font-medium text-gray-500">/mes</span>
-              </p>
-              <p className="mt-1 text-sm font-medium text-gray-600">
-                + $0.10 por pedido generado
-              </p>
-              <p className="mt-2 text-sm text-gray-500">14 días de prueba gratis</p>
-              <ul className="mt-6 space-y-3 text-left text-sm text-gray-700">
-                {[
-                  "Catálogo ilimitado por tienda",
-                  "Checkout COD y WhatsApp",
-                  "Integración con Shopify",
-                  "Notificaciones por Telegram",
-                  "Métricas y panel de control",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2">
-                    <span className="text-whatsapp">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/signup"
-                className="mt-8 block rounded-lg bg-whatsapp px-6 py-3 font-semibold text-white hover:bg-whatsapp-dark"
-              >
-                Empezar prueba gratis
-              </Link>
+          <div className="mx-auto max-w-4xl px-6">
+            <h2 className="text-center text-3xl font-bold">
+              Empieza gratis, paga solo cuando creces
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-center text-gray-600">
+              Sin costo hasta {FREE_ORDER_LIMIT} pedidos al mes. Cuando vendes más,
+              el plan Pro se encarga.
+            </p>
+
+            <div className="mt-12 grid gap-8 md:grid-cols-2">
+              {/* Free */}
+              <div className="flex flex-col rounded-2xl border border-gray-200 p-8 shadow-sm">
+                <p className="text-sm font-medium uppercase tracking-wide text-gray-500">
+                  Free
+                </p>
+                <p className="mt-4 text-5xl font-extrabold">
+                  $0<span className="text-lg font-medium text-gray-500">/mes</span>
+                </p>
+                <p className="mt-1 text-sm font-medium text-gray-600">
+                  Hasta {FREE_ORDER_LIMIT} pedidos al mes
+                </p>
+                <ul className="mt-6 flex-1 space-y-3 text-sm text-gray-700">
+                  {[
+                    "Catálogo estilo WhatsApp",
+                    "Checkout COD y WhatsApp",
+                    "Integración con Shopify",
+                    `Hasta ${FREE_ORDER_LIMIT} pedidos al mes`,
+                    "Notificaciones por Telegram",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="text-whatsapp">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/signup"
+                  className="mt-8 block rounded-lg border border-gray-300 px-6 py-3 text-center font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Empezar gratis
+                </Link>
+              </div>
+
+              {/* Pro */}
+              <div className="relative flex flex-col rounded-2xl border-2 border-whatsapp p-8 shadow-sm">
+                <span className="absolute -top-3 left-8 rounded-full bg-whatsapp px-3 py-1 text-xs font-semibold text-white">
+                  Recomendado
+                </span>
+                <p className="text-sm font-medium uppercase tracking-wide text-whatsapp-teal">
+                  Pro
+                </p>
+                <p className="mt-4 text-5xl font-extrabold">
+                  {formatUsd(PRO_PRICE_MONTHLY)}
+                  <span className="text-lg font-medium text-gray-500">/mes</span>
+                </p>
+                <p className="mt-1 text-sm font-medium text-gray-600">
+                  {PRO_INCLUDED_ORDERS} pedidos incluidos · luego{" "}
+                  {formatUsd(PRO_OVERAGE_RATE)} por pedido extra
+                </p>
+                <ul className="mt-6 flex-1 space-y-3 text-sm text-gray-700">
+                  {[
+                    "Todo lo del plan Free",
+                    "Pedidos ilimitados (10 incluidos + excedente)",
+                    "Métricas y panel de control",
+                    "Soporte prioritario",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="text-whatsapp">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/signup"
+                  className="mt-8 block rounded-lg bg-whatsapp px-6 py-3 text-center font-semibold text-white hover:bg-whatsapp-dark"
+                >
+                  Empezar con Pro
+                </Link>
+              </div>
             </div>
           </div>
         </section>

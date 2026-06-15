@@ -14,7 +14,7 @@ export default function SignupPage() {
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
           <h1 className="mb-2 text-center text-2xl font-bold">Crea tu cuenta</h1>
           <p className="mb-6 text-center text-sm text-gray-500">
-            14 días de prueba gratis. Cancela cuando quieras.
+            Empieza gratis. Sin tarjeta de crédito.
           </p>
           <Suspense fallback={null}>
             <AuthForm mode="signup" />

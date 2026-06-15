@@ -17,13 +17,14 @@ export default function TermsPage() {
         contra entrega (COD).
       </p>
 
-      <h2>2. Suscripción y pagos</h2>
+      <h2>2. Planes y pagos</h2>
       <ul>
-        <li>El plan tiene una cuota mensual fija más un cargo por uso de $0.10 por cada pedido generado a través del servicio, facturados mediante Stripe.</li>
+        <li>Plan Free: sin costo, con un límite de 10 pedidos generados por mes.</li>
+        <li>Plan Pro: cuota mensual fija que incluye 10 pedidos, más un cargo por uso de $0.05 por cada pedido adicional generado a través del servicio, facturados mediante Stripe.</li>
         <li>Los cargos por uso se acumulan durante el periodo y se cobran en la factura correspondiente.</li>
-        <li>Ofrecemos un periodo de prueba gratuito; al finalizar, se cobra automáticamente salvo cancelación.</li>
-        <li>Puedes cancelar en cualquier momento desde el portal de cliente; el acceso continúa hasta el fin del periodo pagado.</li>
-        <li>Si un pago falla, podemos suspender el acceso al panel y/o el checkout del catálogo.</li>
+        <li>Si ofrecemos un periodo de prueba, al finalizar se cobra automáticamente salvo cancelación.</li>
+        <li>Puedes cancelar en cualquier momento desde el portal de cliente; el acceso Pro continúa hasta el fin del periodo pagado.</li>
+        <li>Si un pago falla, tu cuenta puede volver al plan Free (con su límite mensual de pedidos).</li>
       </ul>
 
       <h2>3. Responsabilidades del comercio</h2>

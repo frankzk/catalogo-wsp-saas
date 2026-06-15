@@ -2,11 +2,12 @@ import "server-only";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSubscriptionActive } from "@/lib/subscription-status";
 import { serverEnv } from "@/lib/env";
 
 /**
  * Reports one (or more) "order generated" units to Stripe's metered billing so
- * the merchant is charged the per-order fee ($0.10). Wired up in Phase 3 when
+ * the merchant is charged the per-order overage ($0.05). Wired up in Phase 3 when
  * orders are created server-side. No-op if usage billing is not configured.
  *
  * @param stripeCustomerId  The merchant's Stripe customer id.
@@ -60,7 +61,8 @@ export async function syncSubscriptionForCustomer(
   const trialEnd = subscription?.trial_end
     ? new Date(subscription.trial_end * 1000).toISOString()
     : null;
-  const priceId = subscription?.items?.data?.[0]?.price?.id ?? null;
+  // Derive the entitlement tier from the status (active/trialing => Pro).
+  const plan = isSubscriptionActive(status) ? "pro" : "free";
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -68,7 +70,7 @@ export async function syncSubscriptionForCustomer(
     .update({
       subscription_status: status,
       trial_ends_at: trialEnd,
-      plan: priceId,
+      plan,
     })
     .eq("stripe_customer_id", customerId);
 

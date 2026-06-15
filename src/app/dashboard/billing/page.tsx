@@ -1,9 +1,18 @@
 import { getCurrentMerchant, isSubscriptionActive } from "@/lib/subscription";
 import { SubscriptionBadge } from "@/components/subscription-badge";
+import { PlanBadge } from "@/components/plan-badge";
 import {
   ManageBillingButton,
   SubscribeButton,
 } from "@/components/billing-buttons";
+import {
+  FREE_ORDER_LIMIT,
+  PRO_INCLUDED_ORDERS,
+  PRO_OVERAGE_RATE,
+  PRO_PRICE_MONTHLY,
+  formatUsd,
+  planTier,
+} from "@/lib/plans";
 
 export const metadata = { title: "Facturación" };
 
@@ -24,6 +33,7 @@ export default async function BillingPage({
   const params = await searchParams;
   const merchant = await getCurrentMerchant();
   const active = isSubscriptionActive(merchant?.subscription_status);
+  const tier = planTier(merchant?.subscription_status);
   const trialEnds = formatDate(merchant?.trial_ends_at ?? null);
 
   return (
@@ -31,16 +41,9 @@ export default async function BillingPage({
       <div>
         <h1 className="text-2xl font-bold">Facturación</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Gestiona tu suscripción al plan Pro.
+          Tu plan actual y opciones de suscripción.
         </p>
       </div>
-
-      {params.reason === "subscription_required" && !active && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Necesitas una suscripción activa para acceder al panel. Activa tu
-          prueba gratis para continuar.
-        </div>
-      )}
 
       {params.checkout === "cancelled" && (
         <div className="rounded-lg bg-gray-100 px-4 py-3 text-sm text-gray-700">
@@ -49,58 +52,82 @@ export default async function BillingPage({
         </div>
       )}
 
+      {/* Current plan */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Plan Pro</h2>
-          <SubscriptionBadge status={merchant?.subscription_status} />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Tu plan
+          </h2>
+          <PlanBadge tier={tier} />
         </div>
-        <p className="mt-1 text-3xl font-extrabold">
-          $4.90
-          <span className="text-base font-medium text-gray-500">/mes</span>
-        </p>
-        <p className="text-sm font-medium text-gray-600">
-          + $0.10 por pedido generado
-        </p>
 
-        {trialEnds && (
-          <p className="mt-2 text-sm text-gray-500">
-            {merchant?.subscription_status === "trialing"
-              ? `Tu prueba termina el ${trialEnds}.`
-              : `Periodo de prueba: hasta el ${trialEnds}.`}
-          </p>
-        )}
-
-        <div className="mt-6">
-          {active ? (
-            <ManageBillingButton />
-          ) : (
-            <>
-              <SubscribeButton
-                label={
-                  merchant?.stripe_customer_id
-                    ? "Reactivar suscripción"
-                    : "Empezar prueba gratis de 14 días"
-                }
-              />
-              <p className="mt-3 text-xs text-gray-400">
-                Serás redirigido a Stripe para completar el proceso de forma
-                segura. Puedes cancelar en cualquier momento.
+        {tier === "pro" ? (
+          <>
+            <div className="mt-3 flex items-center gap-2">
+              <p className="text-2xl font-extrabold">
+                Pro · {formatUsd(PRO_PRICE_MONTHLY)}
+                <span className="text-base font-medium text-gray-500">/mes</span>
               </p>
-            </>
-          )}
-        </div>
+              <SubscriptionBadge status={merchant?.subscription_status} />
+            </div>
+            <p className="mt-1 text-sm text-gray-500">
+              {PRO_INCLUDED_ORDERS} pedidos incluidos, luego{" "}
+              {formatUsd(PRO_OVERAGE_RATE)} por pedido extra.
+            </p>
+            {trialEnds && (
+              <p className="mt-1 text-sm text-gray-500">
+                {merchant?.subscription_status === "trialing"
+                  ? `Tu prueba termina el ${trialEnds}.`
+                  : `Periodo de prueba: hasta el ${trialEnds}.`}
+              </p>
+            )}
+            <div className="mt-6">
+              <ManageBillingButton />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-2xl font-extrabold">
+              Free · $0<span className="text-base font-medium text-gray-500">/mes</span>
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              Incluye hasta {FREE_ORDER_LIMIT} pedidos al mes.
+            </p>
+          </>
+        )}
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-        <h3 className="mb-2 font-semibold text-gray-900">¿Qué incluye?</h3>
-        <ul className="space-y-1">
-          <li>✓ Catálogo estilo WhatsApp por tienda</li>
-          <li>✓ Checkout COD y WhatsApp</li>
-          <li>✓ Integración con Shopify</li>
-          <li>✓ Notificaciones por Telegram</li>
-          <li>✓ Métricas y panel de control</li>
-        </ul>
-      </div>
+      {/* Upgrade card (only for Free) */}
+      {!active && (
+        <div className="rounded-xl border-2 border-whatsapp bg-white p-6">
+          <h2 className="text-lg font-semibold">Pasar a Pro</h2>
+          <p className="mt-1 text-3xl font-extrabold">
+            {formatUsd(PRO_PRICE_MONTHLY)}
+            <span className="text-base font-medium text-gray-500">/mes</span>
+          </p>
+          <p className="text-sm font-medium text-gray-600">
+            {PRO_INCLUDED_ORDERS} pedidos incluidos · luego{" "}
+            {formatUsd(PRO_OVERAGE_RATE)} por pedido extra
+          </p>
+          <ul className="mt-4 space-y-1 text-sm text-gray-700">
+            <li>✓ Pedidos sin tope mensual</li>
+            <li>✓ Todo lo del plan Free</li>
+            <li>✓ Métricas y panel de control</li>
+            <li>✓ Soporte prioritario</li>
+          </ul>
+          <div className="mt-6">
+            <SubscribeButton
+              label={
+                merchant?.stripe_customer_id ? "Reactivar Pro" : "Pasar a Pro"
+              }
+            />
+            <p className="mt-3 text-xs text-gray-400">
+              Serás redirigido a Stripe para completar el proceso de forma
+              segura. Puedes cancelar en cualquier momento.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

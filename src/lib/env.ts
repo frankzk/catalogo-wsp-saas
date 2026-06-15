@@ -33,7 +33,7 @@ export function serverEnv() {
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     stripePortalReturnUrl:
       process.env.STRIPE_PORTAL_RETURN_URL ?? `${appBaseUrl}/dashboard/billing`,
-    stripeTrialDays: Number(process.env.STRIPE_TRIAL_DAYS ?? "14"),
+    stripeTrialDays: Number(process.env.STRIPE_TRIAL_DAYS ?? "0"),
     // Shopify (used in Phase 2)
     shopifyApiKey: process.env.SHOPIFY_API_KEY ?? "",
     shopifyApiSecret: process.env.SHOPIFY_API_SECRET ?? "",
