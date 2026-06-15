@@ -109,8 +109,11 @@ export default function MarketingPage() {
                 Plan Pro
               </p>
               <p className="mt-4 text-5xl font-extrabold">
-                $29
+                $4.90
                 <span className="text-lg font-medium text-gray-500">/mes</span>
+              </p>
+              <p className="mt-1 text-sm font-medium text-gray-600">
+                + $0.10 por pedido generado
               </p>
               <p className="mt-2 text-sm text-gray-500">14 días de prueba gratis</p>
               <ul className="mt-6 space-y-3 text-left text-sm text-gray-700">

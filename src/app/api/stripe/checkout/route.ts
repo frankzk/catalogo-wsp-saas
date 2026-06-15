@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
@@ -50,10 +51,19 @@ export async function POST() {
   const priceId = requireEnv(env.stripePriceId, "STRIPE_PRICE_ID");
   const trialDays = env.stripeTrialDays;
 
+  // Base flat plan ($4.90/mo) + optional metered per-order price ($0.10/order).
+  // Metered prices must NOT include a quantity.
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    { price: priceId, quantity: 1 },
+  ];
+  if (env.stripeUsagePriceId) {
+    lineItems.push({ price: env.stripeUsagePriceId });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: lineItems,
     subscription_data: {
       // Only first-timers should really get a trial; for MVP we always offer it.
       trial_period_days: trialDays > 0 ? trialDays : undefined,

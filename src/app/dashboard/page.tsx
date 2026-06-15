@@ -75,7 +75,9 @@ export default async function DashboardHome({
         </div>
         <div className="mt-3 flex items-center justify-between">
           <div>
-            <p className="text-lg font-semibold">Plan Pro · $29/mes</p>
+            <p className="text-lg font-semibold">
+              Plan Pro · $4.90/mes + $0.10/pedido
+            </p>
             {trialEnds && (
               <p className="text-sm text-gray-500">
                 Prueba hasta el {trialEnds}

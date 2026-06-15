@@ -6,7 +6,7 @@ entrega (COD)**.
 
 - **Frontend + API**: Next.js (App Router) en Vercel
 - **Base de datos + Auth**: Supabase (Postgres + Auth, con Row Level Security)
-- **Cobros**: Stripe Billing (Checkout + Customer Portal + Webhooks), plan flat mensual con prueba de 14 días
+- **Cobros**: Stripe Billing (Checkout + Customer Portal + Webhooks): cuota base mensual ($4.90) + $0.10 por pedido generado (uso medido), con prueba de 14 días
 - **Integración**: Shopify App público (OAuth) — _Fase 2_
 
 > Este repositorio implementa la **Fase 1** completa: scaffold de Next.js,
@@ -39,7 +39,7 @@ entrega (COD)**.
 
 - ✅ Registro / login de comercios (Supabase Auth: email + Google)
 - ✅ Creación automática del `merchant` al registrarse (trigger en DB)
-- ✅ Suscripción mensual con Stripe Checkout + prueba de 14 días
+- ✅ Suscripción: cuota base mensual + cargo por uso ($0.10/pedido) con Stripe Checkout + prueba de 14 días
 - ✅ Customer Portal de Stripe para gestionar / cancelar
 - ✅ Webhooks de Stripe que sincronizan el estado y **cortan acceso** si no se paga
 - ✅ Esquema Postgres completo (`merchants`, `stores`, `store_configs`, `orders`, `events`) con **Row Level Security**
@@ -140,15 +140,29 @@ rellenar**.
 
 ### 2. Stripe
 
+El modelo de cobro es **híbrido**: una cuota base fija + un cargo por uso
+(metered) por cada pedido generado.
+
 1. Crea tu cuenta en <https://stripe.com> (puedes empezar en **modo test**).
-2. **Producto y precio**: **Product catalog → Add product**. Crea un precio
-   **recurrente mensual** (p. ej. $29/mes). Copia el **Price ID** (`price_…`)
-   → `STRIPE_PRICE_ID`.
-3. **API key**: **Developers → API keys** → copia la **Secret key**
+2. **Precio base (cuota fija)**: **Product catalog → Add product**. Crea un
+   precio **recurrente mensual** de **$4.90/mes**. Copia el **Price ID**
+   (`price_…`) → `STRIPE_PRICE_ID`.
+3. **Cobro por pedido (uso medido)**:
+   - **Billing → Meters → Create meter**. En _Event name_ pon `order_generated`
+     (debe coincidir con `STRIPE_USAGE_METER_EVENT`) y agregación **Sum**.
+   - Crea un **precio medido** (metered) vinculado a ese meter, de **$0.10 por
+     unidad** (puede ir dentro del mismo producto). Copia su **Price ID** →
+     `STRIPE_USAGE_PRICE_ID`.
+   - _(Opcional)_ ¿Quieres incluir un cupo gratis (p. ej. los primeros 50
+     pedidos del mes sin costo)? Usa **precios escalonados (tiered)** en ese
+     precio: primer tramo hasta _N_ a $0 y el resto a $0.10. El código no
+     cambia: siempre reporta 1 evento por pedido y Stripe aplica los tramos.
+   - Para desactivar el cobro por pedido, deja `STRIPE_USAGE_PRICE_ID` vacío.
+4. **API key**: **Developers → API keys** → copia la **Secret key**
    (`sk_test_…`) → `STRIPE_SECRET_KEY`.
-4. **Customer Portal**: **Settings → Billing → Customer portal** → actívalo y
+5. **Customer Portal**: **Settings → Billing → Customer portal** → actívalo y
    permite cancelar la suscripción (necesario para `/api/stripe/portal`).
-5. **Webhook** (producción): **Developers → Webhooks → Add endpoint**:
+6. **Webhook** (producción): **Developers → Webhooks → Add endpoint**:
    - URL: `https://TU_DOMINIO/api/stripe/webhook`
    - Eventos a escuchar:
      - `checkout.session.completed`
@@ -158,7 +172,7 @@ rellenar**.
      - `invoice.payment_failed`
      - `invoice.paid`
    - Copia el **Signing secret** (`whsec_…`) → `STRIPE_WEBHOOK_SECRET`
-6. Define también:
+7. Define también:
    - `STRIPE_PORTAL_RETURN_URL` = `http://localhost:3000/dashboard/billing`
      (o tu dominio en prod)
    - `STRIPE_TRIAL_DAYS` = `14`
@@ -224,7 +238,9 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 | `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → API | anon/public |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → API | **secreto**, solo servidor |
 | `STRIPE_SECRET_KEY` | Stripe → API keys | `sk_test_…` / `sk_live_…` |
-| `STRIPE_PRICE_ID` | Stripe → Producto | `price_…` |
+| `STRIPE_PRICE_ID` | Stripe → Precio base | `price_…` (cuota fija $4.90/mes) |
+| `STRIPE_USAGE_PRICE_ID` | Stripe → Precio medido | `price_…` ($0.10/pedido; vacío = sin cobro por uso) |
+| `STRIPE_USAGE_METER_EVENT` | Stripe → Meter | nombre del evento (`order_generated`) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe → Webhooks / CLI | `whsec_…` |
 | `STRIPE_PORTAL_RETURN_URL` | Tú | regreso del portal |
 | `STRIPE_TRIAL_DAYS` | Tú | p. ej. `14` |
@@ -252,6 +268,9 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 - Los **webhooks** mantienen el estado al día: renovaciones, fallos de pago y
   cancelaciones. Los estados `past_due` / `unpaid` / `canceled` **cortan el
   acceso**.
+- El **cargo por uso** ($0.10/pedido) se reportará a Stripe al generar cada
+  pedido (Fase 3) mediante _meter events_ (`reportOrderUsage` en
+  `src/lib/billing.ts`); Stripe lo factura junto con la cuota base.
 - El catálogo público (_Fase 3_) seguirá sirviéndose; si la suscripción está
   vencida, se podrá desactivar el checkout (campo
   `store_configs.disable_checkout_when_unpaid`).

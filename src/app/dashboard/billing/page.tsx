@@ -55,8 +55,11 @@ export default async function BillingPage({
           <SubscriptionBadge status={merchant?.subscription_status} />
         </div>
         <p className="mt-1 text-3xl font-extrabold">
-          $29
+          $4.90
           <span className="text-base font-medium text-gray-500">/mes</span>
+        </p>
+        <p className="text-sm font-medium text-gray-600">
+          + $0.10 por pedido generado
         </p>
 
         {trialEnds && (

@@ -19,7 +19,8 @@ export default function TermsPage() {
 
       <h2>2. Suscripción y pagos</h2>
       <ul>
-        <li>El plan se cobra de forma mensual a través de Stripe.</li>
+        <li>El plan tiene una cuota mensual fija más un cargo por uso de $0.10 por cada pedido generado a través del servicio, facturados mediante Stripe.</li>
+        <li>Los cargos por uso se acumulan durante el periodo y se cobran en la factura correspondiente.</li>
         <li>Ofrecemos un periodo de prueba gratuito; al finalizar, se cobra automáticamente salvo cancelación.</li>
         <li>Puedes cancelar en cualquier momento desde el portal de cliente; el acceso continúa hasta el fin del periodo pagado.</li>
         <li>Si un pago falla, podemos suspender el acceso al panel y/o el checkout del catálogo.</li>

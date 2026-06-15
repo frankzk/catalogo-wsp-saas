@@ -27,6 +27,9 @@ export function serverEnv() {
     // Stripe
     stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
     stripePriceId: process.env.STRIPE_PRICE_ID ?? "",
+    stripeUsagePriceId: process.env.STRIPE_USAGE_PRICE_ID ?? "",
+    stripeUsageMeterEvent:
+      process.env.STRIPE_USAGE_METER_EVENT ?? "order_generated",
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     stripePortalReturnUrl:
       process.env.STRIPE_PORTAL_RETURN_URL ?? `${appBaseUrl}/dashboard/billing`,
