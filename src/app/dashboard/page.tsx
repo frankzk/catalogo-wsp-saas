@@ -48,7 +48,14 @@ export default async function DashboardHome({
   const limit = includedOrders(tier);
   const trialEnds = formatDate(merchant?.trial_ends_at ?? null);
 
-  const onboarding = [
+  const onboarding: Array<{
+    title: string;
+    body: string;
+    done: boolean;
+    soon?: boolean;
+    href?: string;
+    cta?: string;
+  }> = [
     {
       title: "Tu cuenta está lista",
       body: `Estás en el plan ${tier === "pro" ? "Pro" : "Free"}. Puedes empezar a configurar.`,
@@ -56,15 +63,17 @@ export default async function DashboardHome({
     },
     {
       title: "Conecta tu tienda Shopify",
-      body: "Instala la app con un clic para sincronizar productos. (Fase 2)",
+      body: "Instala la app con un clic para sincronizar productos.",
       done: false,
-      soon: true,
+      href: "/dashboard/stores",
+      cta: "Conectar",
     },
     {
       title: "Configura tu catálogo",
-      body: "Marca, descuento, WhatsApp, COD y Telegram. (Fase 2)",
+      body: "Marca, descuento, WhatsApp, COD y Telegram.",
       done: false,
-      soon: true,
+      href: "/dashboard/stores",
+      cta: "Configurar",
     },
     {
       title: "Publica y vende",
@@ -190,6 +199,14 @@ export default async function DashboardHome({
                   )}
                 </p>
                 <p className="mt-1 text-sm text-gray-500">{step.body}</p>
+                {step.href && step.cta && (
+                  <Link
+                    href={step.href}
+                    className="mt-2 inline-block text-sm font-medium text-whatsapp-teal hover:underline"
+                  >
+                    {step.cta} →
+                  </Link>
+                )}
               </div>
             </div>
           ))}

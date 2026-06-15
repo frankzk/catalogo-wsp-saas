@@ -41,6 +41,7 @@ export function serverEnv() {
       process.env.SHOPIFY_SCOPES ??
       "read_products,read_inventory,write_orders,read_customers,write_customers",
     shopifyAppUrl: process.env.SHOPIFY_APP_URL ?? appBaseUrl,
+    shopifyApiVersion: process.env.SHOPIFY_API_VERSION ?? "2024-10",
     // Encryption
     tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY ?? "",
   };

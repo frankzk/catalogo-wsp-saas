@@ -7,7 +7,7 @@ entrega (COD)**.
 - **Frontend + API**: Next.js (App Router) en Vercel
 - **Base de datos + Auth**: Supabase (Postgres + Auth, con Row Level Security)
 - **Cobros**: Stripe Billing (Checkout + Customer Portal + Webhooks). Modelo **freemium**: plan **Free** (hasta 10 pedidos/mes, sin costo) y plan **Pro** ($4.90/mes, 10 pedidos incluidos + $0.05 por pedido extra)
-- **Integración**: Shopify App público (OAuth) — _Fase 2_
+- **Integración**: Shopify App público (OAuth, token cifrado)
 
 > Este repositorio implementa la **Fase 1** completa: scaffold de Next.js,
 > autenticación con Supabase, esquema con RLS, suscripción con Stripe
@@ -18,14 +18,14 @@ entrega (COD)**.
 
 ## Tabla de contenido
 
-1. [Qué incluye la Fase 1](#qué-incluye-la-fase-1)
+1. [Qué incluye (Fases 1–2)](#qué-incluye-fases-12)
 2. [Estructura del proyecto](#estructura-del-proyecto)
 3. [Inicio rápido (local)](#inicio-rápido-local)
 4. [Guía de cuentas y claves](#guía-de-cuentas-y-claves) ← _empieza aquí_
    - [1. Supabase](#1-supabase)
    - [2. Stripe](#2-stripe)
    - [3. Clave de cifrado](#3-clave-de-cifrado)
-   - [4. Shopify Partners (Fase 2)](#4-shopify-partners-fase-2)
+   - [4. Shopify Partners](#4-shopify-partners)
    - [5. Vercel](#5-vercel)
    - [6. Dominio](#6-dominio)
 5. [Variables de entorno](#variables-de-entorno)
@@ -35,17 +35,27 @@ entrega (COD)**.
 
 ---
 
-## Qué incluye la Fase 1
+## Qué incluye (Fases 1–2)
+
+**Fase 1 — cuentas, suscripción y planes**
 
 - ✅ Registro / login de comercios (Supabase Auth: email + Google)
 - ✅ Creación automática del `merchant` al registrarse (trigger en DB)
 - ✅ Planes Free / Pro con Stripe Checkout (Pro: $4.90/mes, 10 pedidos incluidos + $0.05 excedente)
 - ✅ Customer Portal de Stripe para gestionar / cancelar
-- ✅ Webhooks de Stripe que sincronizan el estado y **cortan acceso** si no se paga
+- ✅ Webhooks de Stripe que sincronizan el plan (Free ↔ Pro)
 - ✅ Esquema Postgres completo (`merchants`, `stores`, `store_configs`, `orders`, `events`) con **Row Level Security**
 - ✅ Middleware: el dashboard requiere autenticación (Free y Pro tienen acceso completo)
-- ✅ Cifrado AES-256-GCM listo para los tokens (Shopify / Telegram)
 - ✅ Páginas de marketing, Política de Privacidad y Términos
+
+**Fase 2 — Shopify + configuración**
+
+- ✅ OAuth de app pública de Shopify con 1 clic (`install` → `callback`)
+- ✅ Verificación **HMAC** del callback y protección CSRF (state + cookie)
+- ✅ Token **offline** guardado **cifrado** (AES-256-GCM) en Postgres
+- ✅ Dashboard de configuración por tienda: marca, logo, % descuento, WhatsApp,
+  país/moneda, modo checkout (WhatsApp/COD), Telegram (cifrado), sellos, slug
+- ✅ Conectar/desconectar tiendas; slug único por catálogo
 - ✅ Compila y despliega sin configuración previa (las claves se validan en tiempo de petición)
 
 ---
@@ -62,20 +72,23 @@ catalogo-wsp-saas/
 │   │   ├── page.tsx              # Landing de marketing
 │   │   ├── login / signup        # Autenticación
 │   │   ├── auth/callback         # Intercambio de código OAuth / email
-│   │   ├── dashboard/            # Panel (protegido)
-│   │   │   └── billing/          # Suscripción (siempre accesible para activar/pagar)
+│   │   ├── dashboard/            # Panel (requiere login)
+│   │   │   ├── stores/           # Conectar Shopify + configurar catálogo por tienda
+│   │   │   │   ├── actions.ts    # Server actions: guardar config / desconectar
+│   │   │   │   └── [id]/         # Configuración de una tienda
+│   │   │   └── billing/          # Plan Free/Pro (upgrade / portal)
 │   │   ├── privacy / terms       # Legales
-│   │   └── api/stripe/
-│   │       ├── checkout          # Crea la sesión de Checkout
-│   │       ├── checkout/success  # Sync síncrono post-pago (evita race con el webhook)
-│   │       ├── portal            # Abre el Customer Portal
-│   │       └── webhook           # Recibe eventos de Stripe
-│   ├── components/               # UI (auth, botones de billing, badges, legal)
+│   │   └── api/
+│   │       ├── stripe/           # checkout · checkout/success · portal · webhook
+│   │       └── shopify/          # install (inicia OAuth) · callback (guarda token)
+│   ├── components/               # UI (auth, billing, plan, store config, etc.)
 │   └── lib/
 │       ├── env.ts                # Acceso central a variables de entorno
-│       ├── crypto.ts             # AES-256-GCM
+│       ├── crypto.ts             # AES-256-GCM (tokens en reposo)
 │       ├── stripe.ts             # Cliente Stripe
-│       ├── billing.ts            # Sync de suscripción → merchants
+│       ├── shopify.ts            # OAuth + HMAC + Admin API
+│       ├── billing.ts            # Sync de suscripción + reporte de uso
+│       ├── plans.ts              # Modelo de planes (Free/Pro, límites, tarifas)
 │       ├── subscription*.ts      # Helpers de estado / gating
 │       └── supabase/             # Clientes browser / server / admin / middleware
 └── .env.example                  # Plantilla de variables
@@ -199,16 +212,23 @@ openssl rand -base64 32
 
 Pégala en `TOKEN_ENCRYPTION_KEY`.
 
-### 4. Shopify Partners (Fase 2)
+### 4. Shopify Partners
 
-Puedes dejarlo listo desde ya aunque el flujo OAuth se implementa en la Fase 2.
+El flujo OAuth ya está implementado (`/api/shopify/install` → `/api/shopify/callback`).
 
 1. Crea una cuenta en <https://partners.shopify.com>.
 2. **Apps → Create app → Create app manually** (app pública).
 3. En **Configuration → App URL**: `https://TU_DOMINIO` (`SHOPIFY_APP_URL`).
+   En local puedes usar un túnel (p. ej. `cloudflared` / `ngrok`) porque Shopify
+   exige HTTPS para el callback.
 4. **Allowed redirection URL(s)**: `https://TU_DOMINIO/api/shopify/callback`.
 5. Copia **Client ID** → `SHOPIFY_API_KEY` y **Client secret** → `SHOPIFY_API_SECRET`.
 6. `SHOPIFY_SCOPES` = `read_products,read_inventory,write_orders,read_customers,write_customers`.
+7. _(opcional)_ `SHOPIFY_API_VERSION` (por defecto `2024-10`).
+
+**Cómo conectar una tienda**: inicia sesión → **Tiendas** → escribe
+`tu-tienda.myshopify.com` → **Conectar Shopify**. Tras autorizar, el token
+**offline** se guarda **cifrado** (AES-256-GCM) y se crea la config del catálogo.
 
 ### 5. Vercel
 
@@ -248,10 +268,11 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 | `STRIPE_PORTAL_RETURN_URL` | Tú | regreso del portal |
 | `STRIPE_TRIAL_DAYS` | Tú | p. ej. `14` |
 | `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` | 32 bytes base64 |
-| `SHOPIFY_API_KEY` | Shopify Partners | _Fase 2_ |
-| `SHOPIFY_API_SECRET` | Shopify Partners | _Fase 2_ |
+| `SHOPIFY_API_KEY` | Shopify Partners | Client ID |
+| `SHOPIFY_API_SECRET` | Shopify Partners | Client secret |
 | `SHOPIFY_SCOPES` | Tú | scopes separados por coma |
-| `SHOPIFY_APP_URL` | Tú | URL pública del app |
+| `SHOPIFY_APP_URL` | Tú | URL pública del app (HTTPS) |
+| `SHOPIFY_API_VERSION` | Tú | versión Admin API (`2024-10`) |
 
 > Las variables `NEXT_PUBLIC_*` se exponen al navegador (son públicas por
 > diseño). Todo lo demás permanece solo en el servidor.
@@ -282,10 +303,11 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 
 ## Roadmap
 
-- **Fase 1 — ✅ (este repo)**: Next.js + Supabase (auth + esquema con RLS) +
-  Stripe (checkout / portal / webhook) + gating.
-- **Fase 2**: OAuth de Shopify (`/api/shopify/install` → `/api/shopify/callback`),
-  guardar token cifrado + dashboard de configuración por tienda.
+- **Fase 1 — ✅**: Next.js + Supabase (auth + esquema con RLS) +
+  Stripe (checkout / portal / webhook) + planes Free/Pro.
+- **Fase 2 — ✅**: OAuth de Shopify (`/api/shopify/install` → `/api/shopify/callback`),
+  token offline cifrado + verificación HMAC + dashboard de configuración por
+  tienda (marca, descuento, WhatsApp, COD, Telegram, sellos).
 - **Fase 3**: catálogo dinámico en `/c/[slug]` (reusando la UI de
   `frankzk/catalogo-wsp`), checkout COD server-side (crea el pedido en Shopify),
   notificación por Telegram y métricas.
