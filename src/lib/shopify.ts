@@ -150,3 +150,149 @@ export async function getShopInfo(
     countryCode: data.shop.country_code ?? null,
   };
 }
+
+// ---- Products ---------------------------------------------------------------
+
+export interface ShopifyVariant {
+  id: number;
+  title: string;
+  price: string;
+  compare_at_price: string | null;
+  inventory_quantity: number;
+  inventory_management: string | null;
+}
+
+export interface ShopifyProduct {
+  id: number;
+  title: string;
+  body_html: string | null;
+  product_type: string | null;
+  tags: string;
+  status: string;
+  images: { src: string }[];
+  variants: ShopifyVariant[];
+}
+
+/** Fetch active products (cached for 5 min via the Next data cache). */
+export async function getProducts(
+  shop: string,
+  accessToken: string,
+  limit = 250,
+): Promise<ShopifyProduct[]> {
+  const res = await shopifyAdminFetch(
+    shop,
+    accessToken,
+    `/products.json?status=active&limit=${limit}`,
+    { next: { revalidate: 300 } },
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as { products?: ShopifyProduct[] };
+  return data.products ?? [];
+}
+
+// ---- Customers & orders (COD checkout) -------------------------------------
+
+export interface ShopifyAddress {
+  address1?: string;
+  address2?: string;
+  city?: string;
+  province?: string;
+  zip?: string;
+  country_code?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export interface ShopifyCustomer {
+  id: number;
+  default_address?: ShopifyAddress | null;
+}
+
+/** Find an existing customer by phone (for repeat-order address reuse). */
+export async function findCustomerByPhone(
+  shop: string,
+  accessToken: string,
+  phone: string,
+): Promise<ShopifyCustomer | null> {
+  const query = encodeURIComponent(`phone:${phone}`);
+  const res = await shopifyAdminFetch(
+    shop,
+    accessToken,
+    `/customers/search.json?query=${query}`,
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { customers?: ShopifyCustomer[] };
+  return data.customers?.[0] ?? null;
+}
+
+export interface CreateOrderInput {
+  lineItems: { variant_id: number; quantity: number; price: string }[];
+  phone: string;
+  name?: string;
+  customerId?: number;
+  shippingAddress?: ShopifyAddress;
+  currency?: string | null;
+  note?: string;
+  tags?: string;
+}
+
+export interface CreatedOrder {
+  id: number;
+  name: string;
+  total: string;
+}
+
+/** Create a pending (cash-on-delivery) order in Shopify. */
+export async function createOrder(
+  shop: string,
+  accessToken: string,
+  input: CreateOrderInput,
+): Promise<CreatedOrder | null> {
+  const order: Record<string, unknown> = {
+    line_items: input.lineItems,
+    financial_status: "pending",
+    gateway: "Cash on Delivery (COD)",
+    send_receipt: false,
+    send_fulfillment_receipt: false,
+    inventory_behaviour: "decrement_obeying_policy",
+    tags: input.tags ?? "COD, Catalogo WSP",
+    note: input.note ?? "Pedido contra entrega (COD) vía catálogo",
+  };
+
+  order.customer = input.customerId
+    ? { id: input.customerId }
+    : { phone: input.phone, first_name: input.name ?? "Cliente" };
+
+  if (input.shippingAddress) {
+    order.shipping_address = {
+      ...input.shippingAddress,
+      phone: input.phone,
+      first_name: input.shippingAddress.first_name ?? input.name ?? "Cliente",
+      last_name: input.shippingAddress.last_name ?? "",
+    };
+  }
+  if (input.currency) order.currency = input.currency;
+
+  const res = await shopifyAdminFetch(shop, accessToken, "/orders.json", {
+    method: "POST",
+    body: JSON.stringify({ order }),
+  });
+  if (!res.ok) {
+    console.error(
+      "Shopify order creation failed:",
+      res.status,
+      await res.text().catch(() => ""),
+    );
+    return null;
+  }
+  const data = (await res.json()) as {
+    order?: { id: number; name: string; total_price: string };
+  };
+  if (!data.order) return null;
+  return {
+    id: data.order.id,
+    name: data.order.name,
+    total: data.order.total_price,
+  };
+}

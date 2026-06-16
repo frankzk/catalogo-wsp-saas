@@ -56,6 +56,20 @@ entrega (COD)**.
 - ✅ Dashboard de configuración por tienda: marca, logo, % descuento, WhatsApp,
   país/moneda, modo checkout (WhatsApp/COD), Telegram (cifrado), sellos, slug
 - ✅ Conectar/desconectar tiendas; slug único por catálogo
+
+**Fase 3 — catálogo, checkout COD y métricas**
+
+- ✅ Catálogo público en `/c/[slug]`: grilla estilo WhatsApp, categorías auto,
+  más vendidos primero, precios enteros con descuento, agotados ocultos
+- ✅ Pantalla de acceso que pide el celular (selector de país + validación)
+- ✅ Detalle con carrusel de imágenes, variantes y reseña
+- ✅ Checkout **COD server-side**: el backend crea el pedido en Shopify
+  (pago pendiente), identifica al cliente por teléfono y reutiliza su dirección
+  en recompras; precios recalculados en el servidor (no se confía en el cliente)
+- ✅ Modo **WhatsApp** alternativo (mensaje wa.me con el pedido)
+- ✅ Notificación de pedido por **Telegram**
+- ✅ Tope de 10 pedidos/mes del plan Free + reporte de excedente Pro a Stripe
+- ✅ Métricas por tienda (vistas, carrito, pedidos) en el dashboard
 - ✅ Compila y despliega sin configuración previa (las claves se validan en tiempo de petición)
 
 ---
@@ -73,22 +87,28 @@ catalogo-wsp-saas/
 │   │   ├── login / signup        # Autenticación
 │   │   ├── auth/callback         # Intercambio de código OAuth / email
 │   │   ├── dashboard/            # Panel (requiere login)
-│   │   │   ├── stores/           # Conectar Shopify + configurar catálogo por tienda
-│   │   │   │   ├── actions.ts    # Server actions: guardar config / desconectar
-│   │   │   │   └── [id]/         # Configuración de una tienda
+│   │   │   ├── stores/           # Conectar Shopify + configurar catálogo (actions.ts, [id]/)
+│   │   │   ├── metrics/          # Métricas por tienda
 │   │   │   └── billing/          # Plan Free/Pro (upgrade / portal)
+│   │   ├── c/[slug]/             # Catálogo público (grilla WhatsApp, COD/WhatsApp)
 │   │   ├── privacy / terms       # Legales
 │   │   └── api/
 │   │       ├── stripe/           # checkout · checkout/success · portal · webhook
-│   │       └── shopify/          # install (inicia OAuth) · callback (guarda token)
-│   ├── components/               # UI (auth, billing, plan, store config, etc.)
+│   │       ├── shopify/          # install (inicia OAuth) · callback (guarda token)
+│   │       └── c/[slug]/         # order (COD server-side) · track (métricas)
+│   ├── components/
+│   │   ├── catalog/              # phone-gate · product-detail · catalog-app
+│   │   └── …                     # auth, billing, plan, store config
 │   └── lib/
 │       ├── env.ts                # Acceso central a variables de entorno
 │       ├── crypto.ts             # AES-256-GCM (tokens en reposo)
 │       ├── stripe.ts             # Cliente Stripe
-│       ├── shopify.ts            # OAuth + HMAC + Admin API
+│       ├── shopify.ts            # OAuth + HMAC + Admin API (productos, pedidos)
+│       ├── catalog.ts            # Carga catálogo público + descuento + gating
 │       ├── billing.ts            # Sync de suscripción + reporte de uso
 │       ├── plans.ts              # Modelo de planes (Free/Pro, límites, tarifas)
+│       ├── telegram.ts           # Notificaciones de pedido
+│       ├── money.ts · countries.ts
 │       ├── subscription*.ts      # Helpers de estado / gating
 │       └── supabase/             # Clientes browser / server / admin / middleware
 └── .env.example                  # Plantilla de variables
@@ -308,9 +328,12 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 - **Fase 2 — ✅**: OAuth de Shopify (`/api/shopify/install` → `/api/shopify/callback`),
   token offline cifrado + verificación HMAC + dashboard de configuración por
   tienda (marca, descuento, WhatsApp, COD, Telegram, sellos).
-- **Fase 3**: catálogo dinámico en `/c/[slug]` (reusando la UI de
-  `frankzk/catalogo-wsp`), checkout COD server-side (crea el pedido en Shopify),
-  notificación por Telegram y métricas.
+- **Fase 3 — ✅**: catálogo dinámico en `/c/[slug]` (grilla estilo WhatsApp,
+  pantalla de acceso con celular, detalle con carrusel + reseña, categorías auto,
+  precios enteros con descuento, ocultar agotados, más vendidos primero),
+  checkout COD server-side que crea el pedido en Shopify (cliente por teléfono,
+  recompra reutiliza dirección), modo WhatsApp alternativo, notificación por
+  Telegram, métricas y tope de pedidos del plan Free + excedente Pro.
 - **Fase 4**: pulido, deploy y documentación final. Webhooks GDPR obligatorios
   de Shopify (`customers/data_request`, `customers/redact`, `shop/redact`) +
   verificación HMAC, para listar en el App Store.

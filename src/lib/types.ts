@@ -77,3 +77,50 @@ export interface AnalyticsEvent {
   payload_json: Record<string, unknown>;
   created_at: string;
 }
+
+// ---- Public catalog (Phase 3) ----------------------------------------------
+
+export interface CatalogVariant {
+  id: number; // Shopify variant_id
+  title: string;
+  price: number; // discounted integer price
+  compareAtPrice: number | null; // original integer price (for strikethrough)
+  available: boolean;
+}
+
+export interface CatalogProduct {
+  id: number;
+  title: string;
+  description: string;
+  images: string[];
+  category: string;
+  variants: CatalogVariant[];
+  priceFrom: number;
+  compareAtFrom: number | null;
+  bestseller: boolean;
+}
+
+export interface CatalogConfig {
+  slug: string;
+  brandName: string | null;
+  logoUrl: string | null;
+  headline: string | null;
+  subtitle: string | null;
+  whatsappNumber: string | null;
+  checkoutMode: CheckoutMode;
+  country: string | null;
+  currency: string | null;
+  trustBadges: TrustBadge[];
+  discountPercent: number;
+  checkoutEnabled: boolean;
+  checkoutDisabledReason: string | null;
+}
+
+export interface CatalogData {
+  slug: string;
+  storeId: string;
+  config: CatalogConfig;
+  categories: string[];
+  products: CatalogProduct[];
+}
+
