@@ -70,7 +70,10 @@ entrega (COD)**.
 - ✅ Modo **WhatsApp** alternativo (mensaje wa.me con el pedido)
 - ✅ Notificación de pedido por **Telegram**
 - ✅ Tope de 10 pedidos/mes del plan Free + reporte de excedente Pro a Stripe
-- ✅ Métricas por tienda (vistas, carrito, pedidos) en el dashboard
+- ✅ Panel de **analítica** (Recharts): KPIs con comparación vs. periodo anterior
+  (ingresos, pedidos, ticket promedio, conversión), embudo de conversión,
+  tendencia de ingresos/pedidos, top productos, ventas por tienda, pedidos por
+  día y % de recompra; selector de periodo (7/30/90 días)
 - ✅ Panel de **Pedidos**: filtros (tienda + búsqueda), **scroll infinito** y
   **detalle del pedido** (artículos, cliente, total, enlace a Shopify)
 - ✅ Tests unitarios con **Vitest** (planes, cifrado, HMAC OAuth/webhook, slug, etc.)
@@ -118,6 +121,7 @@ catalogo-wsp-saas/
 │       ├── stripe.ts             # Cliente Stripe
 │       ├── shopify.ts            # OAuth + HMAC + Admin API (productos, pedidos)
 │       ├── catalog.ts            # Carga catálogo público + descuento + gating
+│       ├── analytics.ts          # Agregación de métricas (KPIs, embudo, series)
 │       ├── billing.ts            # Sync de suscripción + reporte de uso
 │       ├── plans.ts              # Modelo de planes (Free/Pro, límites, tarifas)
 │       ├── telegram.ts           # Notificaciones de pedido
