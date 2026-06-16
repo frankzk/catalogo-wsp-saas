@@ -79,6 +79,26 @@ export function verifyOauthHmac(params: URLSearchParams): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
+/**
+ * Verify a Shopify webhook. Unlike the OAuth HMAC (query string, hex), webhook
+ * HMAC is the base64 HMAC-SHA256 of the RAW request body.
+ */
+export function verifyWebhookHmac(
+  rawBody: string,
+  hmacHeader: string | null,
+): boolean {
+  const env = serverEnv();
+  if (!hmacHeader || !env.shopifyApiSecret) return false;
+  const digest = crypto
+    .createHmac("sha256", env.shopifyApiSecret)
+    .update(rawBody, "utf8")
+    .digest("base64");
+  const a = Buffer.from(digest, "utf8");
+  const b = Buffer.from(hmacHeader, "utf8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 interface AccessTokenResponse {
   access_token: string;
   scope: string;
@@ -125,6 +145,20 @@ export async function shopifyAdminFetch(
       ...(init?.headers ?? {}),
     },
   });
+}
+
+/** Register a webhook (e.g. app/uninstalled) after install. Best-effort. */
+export async function registerWebhook(
+  shop: string,
+  accessToken: string,
+  topic: string,
+  address: string,
+): Promise<boolean> {
+  const res = await shopifyAdminFetch(shop, accessToken, "/webhooks.json", {
+    method: "POST",
+    body: JSON.stringify({ webhook: { topic, address, format: "json" } }),
+  });
+  return res.ok;
 }
 
 export interface ShopInfo {

@@ -18,7 +18,7 @@ entrega (COD)**.
 
 ## Tabla de contenido
 
-1. [Qué incluye (Fases 1–2)](#qué-incluye-fases-12)
+1. [Qué incluye (Fases 1–4)](#qué-incluye-fases-14)
 2. [Estructura del proyecto](#estructura-del-proyecto)
 3. [Inicio rápido (local)](#inicio-rápido-local)
 4. [Guía de cuentas y claves](#guía-de-cuentas-y-claves) ← _empieza aquí_
@@ -29,13 +29,14 @@ entrega (COD)**.
    - [5. Vercel](#5-vercel)
    - [6. Dominio](#6-dominio)
 5. [Variables de entorno](#variables-de-entorno)
-6. [Cómo funcionan los planes y el gating](#cómo-funcionan-los-planes-y-el-gating)
-7. [Roadmap](#roadmap)
-8. [Notas de seguridad](#notas-de-seguridad)
+6. [Checklist de despliegue (Vercel)](#checklist-de-despliegue-vercel)
+7. [Cómo funcionan los planes y el gating](#cómo-funcionan-los-planes-y-el-gating)
+8. [Roadmap](#roadmap)
+9. [Notas de seguridad](#notas-de-seguridad)
 
 ---
 
-## Qué incluye (Fases 1–2)
+## Qué incluye (Fases 1–4)
 
 **Fase 1 — cuentas, suscripción y planes**
 
@@ -70,6 +71,13 @@ entrega (COD)**.
 - ✅ Notificación de pedido por **Telegram**
 - ✅ Tope de 10 pedidos/mes del plan Free + reporte de excedente Pro a Stripe
 - ✅ Métricas por tienda (vistas, carrito, pedidos) en el dashboard
+
+**Fase 4 — cumplimiento y deploy**
+
+- ✅ Webhooks de Shopify con verificación **HMAC** (base64 del body crudo)
+- ✅ Webhooks GDPR obligatorios: `customers/data_request`, `customers/redact`, `shop/redact`
+- ✅ `app/uninstalled` registrado tras OAuth (deja de usar el token)
+- ✅ 404 del catálogo, `metadataBase` y checklist de despliegue
 - ✅ Compila y despliega sin configuración previa (las claves se validan en tiempo de petición)
 
 ---
@@ -245,6 +253,11 @@ El flujo OAuth ya está implementado (`/api/shopify/install` → `/api/shopify/c
 5. Copia **Client ID** → `SHOPIFY_API_KEY` y **Client secret** → `SHOPIFY_API_SECRET`.
 6. `SHOPIFY_SCOPES` = `read_products,read_inventory,write_orders,read_customers,write_customers`.
 7. _(opcional)_ `SHOPIFY_API_VERSION` (por defecto `2024-10`).
+8. **Webhooks de cumplimiento (GDPR)**: en el app, sección _Compliance webhooks_,
+   apunta los tres a `https://TU_DOMINIO/api/shopify/webhooks`
+   (`customers/data_request`, `customers/redact`, `shop/redact`). El
+   `app/uninstalled` se registra automáticamente tras la instalación. Todos se
+   verifican con HMAC.
 
 **Cómo conectar una tienda**: inicia sesión → **Tiendas** → escribe
 `tu-tienda.myshopify.com` → **Conectar Shopify**. Tras autorizar, el token
@@ -299,6 +312,30 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 
 ---
 
+## Checklist de despliegue (Vercel)
+
+1. **Sube el repo a GitHub** e impórtalo en Vercel (detecta Next.js solo).
+2. **Variables de entorno** (Settings → Environment Variables): copia todas las
+   de `.env.example`. Pon `APP_BASE_URL`, `NEXT_PUBLIC_APP_BASE_URL` y
+   `SHOPIFY_APP_URL` con tu dominio de producción. Genera un
+   `TOKEN_ENCRYPTION_KEY` nuevo (`openssl rand -base64 32`).
+3. **Supabase**: ejecuta `supabase/schema.sql` y agrega
+   `https://TU_DOMINIO/auth/callback` a las _Redirect URLs_ (y _Site URL_).
+4. **Stripe**: crea el webhook `https://TU_DOMINIO/api/stripe/webhook` con los
+   eventos listados arriba y copia el `whsec_…` a `STRIPE_WEBHOOK_SECRET`.
+   Verifica que existan el precio base y el precio medido escalonado.
+5. **Shopify Partners**: App URL = tu dominio; redirect =
+   `https://TU_DOMINIO/api/shopify/callback`; compliance webhooks →
+   `https://TU_DOMINIO/api/shopify/webhooks`.
+6. **Deploy** y prueba el flujo: registro → conectar Shopify → configurar
+   catálogo → abrir `/c/[slug]` → pedido COD de prueba (revisa Shopify, la tabla
+   `orders`, Telegram y, en Pro, el uso en Stripe).
+
+> Tip: el build **no requiere** variables (las claves se validan en tiempo de
+> petición), así que los _preview deployments_ de Vercel no se rompen.
+
+---
+
 ## Cómo funcionan los planes y el gating
 
 - Al registrarse, un **trigger** crea el `merchant` en el plan **Free**
@@ -334,9 +371,10 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
   checkout COD server-side que crea el pedido en Shopify (cliente por teléfono,
   recompra reutiliza dirección), modo WhatsApp alternativo, notificación por
   Telegram, métricas y tope de pedidos del plan Free + excedente Pro.
-- **Fase 4**: pulido, deploy y documentación final. Webhooks GDPR obligatorios
-  de Shopify (`customers/data_request`, `customers/redact`, `shop/redact`) +
-  verificación HMAC, para listar en el App Store.
+- **Fase 4 — ✅**: webhooks GDPR obligatorios de Shopify
+  (`customers/data_request`, `customers/redact`, `shop/redact`) +
+  `app/uninstalled`, con verificación HMAC; pulido (404 del catálogo,
+  `metadataBase`) y checklist de despliegue.
 
 ---
 
@@ -349,6 +387,11 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
 - Ningún secreto se expone en el front (solo las `NEXT_PUBLIC_*`).
 - El webhook de Stripe **verifica la firma** (`stripe-signature`) antes de
   procesar.
+- Los webhooks de Shopify **verifican HMAC** (base64 del body crudo) antes de
+  procesar; las solicitudes inválidas se rechazan con 401.
+- Cumplimiento GDPR de Shopify: `customers/redact` borra el PII de pedidos
+  (nombre/teléfono) y `shop/redact` elimina toda la data de la tienda.
+- El checkout COD **recalcula precios en el servidor** (no confía en el cliente).
 - Revisa la Política de Privacidad y los Términos (`/privacy`, `/terms`) con un
   asesor legal antes de operar.
 ```

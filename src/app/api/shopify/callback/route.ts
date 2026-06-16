@@ -6,6 +6,7 @@ import {
   exchangeCodeForToken,
   getShopInfo,
   isValidShopDomain,
+  registerWebhook,
   slugify,
   verifyOauthHmac,
 } from "@/lib/shopify";
@@ -147,6 +148,14 @@ export async function GET(request: Request) {
       checkout_mode: "whatsapp",
     });
   }
+
+  // Register the uninstall webhook so we can clean up the token (best-effort).
+  await registerWebhook(
+    shop,
+    accessToken,
+    "app/uninstalled",
+    `${env.shopifyAppUrl}/api/shopify/webhooks`,
+  ).catch(() => {});
 
   // 6. Clear OAuth cookies and head to the store config.
   const response = NextResponse.redirect(
