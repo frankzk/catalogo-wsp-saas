@@ -99,6 +99,7 @@ export function CatalogApp({ data }: { data: CatalogData }) {
   );
 
   const cartCount = cart.reduce((n, it) => n + it.qty, 0);
+  const cartTotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
 
   if (!ready) return null;
   if (!phone) return <PhoneGate config={config} onSubmit={onPhone} />;
@@ -196,6 +197,19 @@ export function CatalogApp({ data }: { data: CatalogData }) {
           </div>
         )}
       </main>
+
+      {/* Sticky "view cart" bar (mobile-friendly checkout CTA) */}
+      {cartCount > 0 && !drawer && (
+        <button
+          onClick={() => setDrawer(true)}
+          className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-3xl items-center justify-between bg-whatsapp px-5 py-3.5 font-semibold text-white shadow-lg"
+        >
+          <span>Ver carrito ({cartCount})</span>
+          <span className="font-bold">
+            {formatMoney(cartTotal, config.currency)}
+          </span>
+        </button>
+      )}
 
       {detail && (
         <ProductDetail

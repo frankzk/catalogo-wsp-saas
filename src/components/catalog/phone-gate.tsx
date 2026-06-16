@@ -42,7 +42,7 @@ export function PhoneGate({
             alt={config.brandName ?? "Logo"}
             width={72}
             height={72}
-            className="mx-auto h-18 w-18 rounded-full object-cover"
+            className="mx-auto block rounded-full object-cover"
             unoptimized
           />
         ) : (

@@ -71,6 +71,8 @@ entrega (COD)**.
 - ✅ Notificación de pedido por **Telegram**
 - ✅ Tope de 10 pedidos/mes del plan Free + reporte de excedente Pro a Stripe
 - ✅ Métricas por tienda (vistas, carrito, pedidos) en el dashboard
+- ✅ Panel de **Pedidos** en el dashboard (con enlace a la orden en Shopify)
+- ✅ Tests unitarios con **Vitest** (planes, cifrado, HMAC OAuth/webhook, slug, etc.)
 
 **Fase 4 — cumplimiento y deploy**
 
@@ -97,6 +99,7 @@ catalogo-wsp-saas/
 │   │   ├── dashboard/            # Panel (requiere login)
 │   │   │   ├── stores/           # Conectar Shopify + configurar catálogo (actions.ts, [id]/)
 │   │   │   ├── metrics/          # Métricas por tienda
+│   │   │   ├── orders/          # Panel de pedidos
 │   │   │   └── billing/          # Plan Free/Pro (upgrade / portal)
 │   │   ├── c/[slug]/             # Catálogo público (grilla WhatsApp, COD/WhatsApp)
 │   │   ├── privacy / terms       # Legales
@@ -143,7 +146,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
 Scripts útiles: `npm run dev`, `npm run build`, `npm run start`,
-`npm run lint`, `npm run typecheck`.
+`npm run lint`, `npm run typecheck`, `npm test` (Vitest).
 
 ---
 

@@ -2,13 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
-
-const NAV = [
-  { href: "/dashboard", label: "Resumen" },
-  { href: "/dashboard/stores", label: "Tiendas" },
-  { href: "/dashboard/metrics", label: "Métricas" },
-  { href: "/dashboard/billing", label: "Facturación" },
-];
+import { DashboardNav } from "@/components/dashboard-nav";
 
 export default async function DashboardLayout({
   children,
@@ -29,17 +23,7 @@ export default async function DashboardLayout({
             <Link href="/dashboard" className="text-lg font-bold">
               Catálogo<span className="text-whatsapp">WSP</span>
             </Link>
-            <nav className="flex gap-1">
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            <DashboardNav />
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-gray-500 sm:inline">
