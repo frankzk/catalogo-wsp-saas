@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { buildRetentionMatrix, type RetentionData } from "@/lib/retention";
 
 /** Executive analytics for the current merchant (RLS-scoped). */
 
@@ -288,4 +289,22 @@ export async function getAnalytics(days = 30): Promise<AnalyticsData> {
       repeatRate: customers ? (repeat / customers) * 100 : 0,
     },
   };
+}
+
+/** Monthly retention cohorts over the last ~12 months (RLS-scoped). */
+export async function getRetentionCohorts(): Promise<RetentionData> {
+  const supabase = await createClient();
+  const since = new Date();
+  since.setUTCMonth(since.getUTCMonth() - 11);
+  since.setUTCDate(1);
+  since.setUTCHours(0, 0, 0, 0);
+
+  const { data } = await supabase
+    .from("orders")
+    .select("phone, created_at")
+    .gte("created_at", since.toISOString());
+
+  return buildRetentionMatrix(
+    (data ?? []) as { phone: string | null; created_at: string }[],
+  );
 }

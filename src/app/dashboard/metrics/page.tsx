@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { getAnalytics } from "@/lib/analytics";
+import { getAnalytics, getRetentionCohorts } from "@/lib/analytics";
 import { AnalyticsDashboard } from "@/components/analytics-dashboard";
+import { RetentionCohort } from "@/components/retention-cohort";
 
 export const metadata = { title: "Métricas" };
 
@@ -15,7 +16,10 @@ export default async function MetricsPage({
   const requested = Number(params.days);
   const days = PERIODS.includes(requested) ? requested : 30;
 
-  const data = await getAnalytics(days);
+  const [data, retention] = await Promise.all([
+    getAnalytics(days),
+    getRetentionCohorts(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -44,6 +48,7 @@ export default async function MetricsPage({
       </div>
 
       <AnalyticsDashboard data={data} />
+      <RetentionCohort data={retention} />
     </div>
   );
 }
