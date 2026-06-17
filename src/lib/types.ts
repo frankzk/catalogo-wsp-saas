@@ -1,0 +1,129 @@
+/** TypeScript shapes mirroring the Postgres schema (see supabase/schema.sql). */
+
+export interface Merchant {
+  id: string;
+  user_id: string;
+  stripe_customer_id: string | null;
+  plan: string | null;
+  subscription_status: string;
+  trial_ends_at: string | null;
+  created_at: string;
+}
+
+export interface Store {
+  id: string;
+  merchant_id: string;
+  shopify_domain: string | null;
+  access_token_encrypted: string | null;
+  scopes: string | null;
+  country: string | null;
+  currency: string | null;
+  created_at: string;
+}
+
+export type CheckoutMode = "whatsapp" | "cod";
+
+export interface StoreConfig {
+  store_id: string;
+  slug: string;
+  brand_name: string | null;
+  logo_url: string | null;
+  discount_percent: number;
+  whatsapp_number: string | null;
+  checkout_mode: CheckoutMode;
+  telegram_bot_token_enc: string | null;
+  telegram_chat_id: string | null;
+  trust_badges_json: TrustBadge[];
+  headline: string | null;
+  subtitle: string | null;
+  country: string | null;
+  currency: string | null;
+  disable_checkout_when_unpaid: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TrustBadge {
+  icon?: string;
+  text: string;
+}
+
+export type OrderStatus = "pending" | "merged" | "cancelled";
+
+export interface Order {
+  id: string;
+  store_id: string;
+  shopify_order_id: string | null;
+  status: OrderStatus;
+  name: string | null;
+  phone: string | null;
+  total: number | null;
+  currency: string | null;
+  items_json: OrderItem[];
+  created_at: string;
+}
+
+export interface OrderItem {
+  variant_id?: string | number;
+  product_id?: string | number;
+  title?: string;
+  quantity: number;
+  price: number;
+}
+
+export type EventType = "view" | "view_product" | "add_to_cart" | "order";
+
+export interface AnalyticsEvent {
+  id: string;
+  store_id: string;
+  type: EventType;
+  payload_json: Record<string, unknown>;
+  created_at: string;
+}
+
+// ---- Public catalog (Phase 3) ----------------------------------------------
+
+export interface CatalogVariant {
+  id: number; // Shopify variant_id
+  title: string;
+  price: number; // discounted integer price
+  compareAtPrice: number | null; // original integer price (for strikethrough)
+  available: boolean;
+}
+
+export interface CatalogProduct {
+  id: number;
+  title: string;
+  description: string;
+  images: string[];
+  category: string;
+  variants: CatalogVariant[];
+  priceFrom: number;
+  compareAtFrom: number | null;
+  bestseller: boolean;
+}
+
+export interface CatalogConfig {
+  slug: string;
+  brandName: string | null;
+  logoUrl: string | null;
+  headline: string | null;
+  subtitle: string | null;
+  whatsappNumber: string | null;
+  checkoutMode: CheckoutMode;
+  country: string | null;
+  currency: string | null;
+  trustBadges: TrustBadge[];
+  discountPercent: number;
+  checkoutEnabled: boolean;
+  checkoutDisabledReason: string | null;
+}
+
+export interface CatalogData {
+  slug: string;
+  storeId: string;
+  config: CatalogConfig;
+  categories: string[];
+  products: CatalogProduct[];
+}
+
