@@ -8,7 +8,6 @@ import type {
   CatalogData,
   CatalogProduct,
   Merchant,
-  OrderItem,
   Store,
   StoreConfig,
 } from "@/lib/types";
@@ -78,42 +77,6 @@ export async function ordersThisMonth(storeId: string): Promise<number> {
     .neq("status", "cancelled")
     .gte("created_at", startOfMonthISO());
   return count ?? 0;
-}
-
-export interface MergeableOrder {
-  id: string;
-  shopify_order_id: string;
-  items_json: OrderItem[];
-}
-
-/**
- * Find a still-pending order from the same customer (phone) at the same store
- * placed within the last 48h — a candidate to merge the new order into.
- */
-export async function findMergeableOrder(
-  storeId: string,
-  phone: string,
-): Promise<MergeableOrder | null> {
-  const admin = createAdminClient();
-  const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-  const { data } = await admin
-    .from("orders")
-    .select("id, shopify_order_id, items_json")
-    .eq("store_id", storeId)
-    .eq("phone", phone)
-    .eq("status", "pending")
-    .not("shopify_order_id", "is", null)
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data?.shopify_order_id) return null;
-  return {
-    id: data.id,
-    shopify_order_id: data.shopify_order_id,
-    items_json: (data.items_json ?? []) as OrderItem[],
-  };
 }
 
 function discountFactor(percent: number): number {

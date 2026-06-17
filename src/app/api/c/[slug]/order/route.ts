@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   discountedInt,
-  findMergeableOrder,
   getCatalogContext,
   isCheckoutBlocked,
 } from "@/lib/catalog";
@@ -11,7 +10,7 @@ import {
   cancelOrder,
   createOrder,
   findCustomerByPhone,
-  getOrder,
+  findMergeableShopifyOrder,
   getProducts,
   type ShopifyAddress,
 } from "@/lib/shopify";
@@ -96,24 +95,37 @@ export async function POST(
     return NextResponse.json({ error: "no_valid_items" }, { status: 400 });
   }
 
-  // --- Order merging: consolidate a pending order from the same customer
-  //     placed within the last 48h (verify it's still open in Shopify). ------
-  const candidate = await findMergeableOrder(store.id, phone);
-  let merge: typeof candidate = null;
-  if (candidate) {
-    const shopOrder = await getOrder(
-      shopDomain,
-      token,
-      candidate.shopify_order_id,
-    ).catch(() => null);
-    if (shopOrder && !shopOrder.cancelled_at && shopOrder.fulfillment_status == null) {
-      merge = candidate;
-    }
-  }
+  // --- Order merging --------------------------------------------------------
+  // Look across ALL of the customer's Shopify orders (by phone) in the last 48h
+  // for one that is open, unfulfilled and UNPAID (paid orders are never touched,
+  // to avoid refunds). If found, consolidate into a single new order.
+  const since48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const merge = await findMergeableShopifyOrder(
+    shopDomain,
+    token,
+    phone,
+    since48h,
+  ).catch(() => null);
 
-  // The monthly Free cap only applies to genuinely new orders — a merge keeps
-  // the net order count unchanged.
-  if (!merge) {
+  const admin = createAdminClient();
+
+  // Was the order to merge one of OURS (already counted/metered this period)?
+  let mergedOursId: string | null = null;
+  if (merge) {
+    const { data: ourRow } = await admin
+      .from("orders")
+      .select("id")
+      .eq("shopify_order_id", String(merge.id))
+      .neq("status", "merged")
+      .neq("status", "cancelled")
+      .maybeSingle();
+    mergedOursId = ourRow?.id ?? null;
+  }
+  const mergeIsOurs = !!mergedOursId;
+
+  // The monthly Free cap is bypassed only when merging one of our own orders
+  // (net count unchanged). A merge of an external order is a net-new order.
+  if (!(merge && mergeIsOurs)) {
     const { blocked } = await isCheckoutBlocked(ctx);
     if (blocked) {
       return NextResponse.json({ error: "limit_reached" }, { status: 402 });
@@ -121,8 +133,11 @@ export async function POST(
   }
 
   const { itemsJson, total } = merge
-    ? mergeOrderItems(merge.items_json, newItems)
-    : { itemsJson: newItems, total: newItems.reduce((s, it) => s + it.price * it.quantity, 0) };
+    ? mergeOrderItems(merge.items, newItems)
+    : {
+        itemsJson: newItems,
+        total: newItems.reduce((s, it) => s + it.price * it.quantity, 0),
+      };
 
   const lineItems = itemsJson
     .filter((it) => it.variant_id != null)
@@ -159,19 +174,22 @@ export async function POST(
     shippingAddress,
     currency: config.currency,
     note: merge
-      ? "Pedido fusionado (incluye un pedido previo de <48h del mismo cliente)"
+      ? `Pedido fusionado (incluye el pedido ${merge.name} de <48h del mismo cliente)`
       : undefined,
   });
   if (!created) {
     return NextResponse.json({ error: "shopify_error" }, { status: 502 });
   }
 
-  const admin = createAdminClient();
-
-  // Cancel + mark the previous order as merged (so it isn't shipped or counted).
+  // Cancel the previous (unpaid) order and mark our copy as merged, if any.
   if (merge) {
-    await cancelOrder(shopDomain, token, merge.shopify_order_id).catch(() => {});
-    await admin.from("orders").update({ status: "merged" }).eq("id", merge.id);
+    await cancelOrder(shopDomain, token, merge.id).catch(() => {});
+    if (mergedOursId) {
+      await admin
+        .from("orders")
+        .update({ status: "merged" })
+        .eq("id", mergedOursId);
+    }
   }
 
   const { data: dbOrder } = await admin
@@ -200,9 +218,13 @@ export async function POST(
     },
   });
 
-  // Meter only genuinely new orders (a merge's original already counted).
+  // Meter the order unless we merged one of our already-metered orders.
   const tier = planTier(merchant?.subscription_status);
-  if (!merge && tier === "pro" && merchant?.stripe_customer_id) {
+  if (
+    !(merge && mergeIsOurs) &&
+    tier === "pro" &&
+    merchant?.stripe_customer_id
+  ) {
     await reportOrderUsage(merchant.stripe_customer_id, {
       identifier: dbOrder?.id ?? String(created.id),
     });
@@ -214,7 +236,7 @@ export async function POST(
       const botToken = decrypt(config.telegram_bot_token_enc);
       const lines = itemsJson.map((i) => `• ${i.quantity}x ${i.title}`).join("\n");
       const mergeNote = merge
-        ? "\n🔗 <i>Fusiona un pedido previo (&lt;48h), cancelado para envío único.</i>"
+        ? `\n🔗 <i>Fusiona el pedido ${merge.name} (&lt;48h, sin pagar), cancelado para envío único.</i>`
         : "";
       const text = `🛒 <b>Nuevo pedido</b> ${created.name}\n${lines}\n\n<b>Total:</b> ${formatMoney(
         total,

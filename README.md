@@ -67,9 +67,10 @@ entrega (COD)**.
 - ✅ Checkout **COD server-side**: el backend crea el pedido en Shopify
   (pago pendiente), identifica al cliente por teléfono y reutiliza su dirección
   en recompras; precios recalculados en el servidor (no se confía en el cliente)
-- ✅ **Fusión de pedidos**: si el cliente ya tiene un pedido pendiente de <48h,
-  se cancela en Shopify (con restock) y sus productos se consolidan en el nuevo
-  para un solo envío; no se cuenta ni cobra doble
+- ✅ **Fusión de pedidos**: si el cliente tiene **cualquier** pedido en Shopify
+  (no solo del catálogo) de <48h, abierto, sin enviar y **sin pagar**, se cancela
+  (con restock) y sus productos se consolidan en el nuevo para un solo envío. Los
+  pedidos **pagados nunca se tocan** (evita reembolsos) y no se cuenta/cobra doble
 - ✅ Modo **WhatsApp** alternativo (mensaje wa.me con el pedido)
 - ✅ Notificación de pedido por **Telegram**
 - ✅ Tope de 10 pedidos/mes del plan Free + reporte de excedente Pro a Stripe
@@ -366,9 +367,11 @@ Copia `.env.example` → `.env.local` y rellena. **Nunca** subas `.env.local`.
   al alcanzarlo, se desactiva el checkout del catálogo hasta el próximo mes o
   hasta pasar a Pro (campo `store_configs.disable_checkout_when_unpaid`; se
   aplica en Fase 3).
-- **Fusión de pedidos**: un pedido fusionado se marca `status = 'merged'` y se
-  excluye del tope, las métricas y la facturación; el pedido previo (ya
-  contado/medido) sigue siendo el que cuenta, así que la fusión no duplica.
+- **Fusión de pedidos**: busca en **todos** los pedidos del cliente en Shopify
+  (por teléfono) uno abierto, sin enviar y **sin pagar** de <48h. Si el que se
+  fusiona es **nuestro**, se marca `status = 'merged'` (excluido del
+  tope/métricas/facturación) y no se vuelve a cobrar; si es **externo**, el
+  pedido consolidado cuenta como nuevo. Los pedidos **pagados** nunca se cancelan.
 - **Excedente Pro**: cada pedido generado en Shopify se reporta a Stripe
   (`reportOrderUsage` en `src/lib/billing.ts`); el precio medido escalonado
   aplica los 10 incluidos y cobra $0.05 desde el pedido #11.

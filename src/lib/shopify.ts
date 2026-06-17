@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { serverEnv } from "@/lib/env";
+import type { OrderItem } from "@/lib/types";
 
 /**
  * Shopify public-app OAuth + Admin API helpers. Node runtime only.
@@ -260,26 +261,87 @@ export async function findCustomerByPhone(
   return data.customers?.[0] ?? null;
 }
 
-export interface ShopifyOrderStatus {
-  id: number;
-  cancelled_at: string | null;
-  fulfillment_status: string | null; // null = unfulfilled
+// Financial statuses where money is involved — never cancel these (would refund).
+const NON_MERGEABLE_FINANCIAL = new Set([
+  "paid",
+  "partially_paid",
+  "partially_refunded",
+  "refunded",
+  "authorized",
+]);
+
+interface ShopifyLineItem {
+  variant_id: number | null;
+  title: string;
+  name?: string;
+  quantity: number;
+  price: string;
 }
 
-/** Fetch minimal order status to decide if it can still be merged/cancelled. */
-export async function getOrder(
+interface ShopifyOrderFull {
+  id: number;
+  name: string;
+  created_at: string;
+  financial_status: string | null;
+  fulfillment_status: string | null;
+  cancelled_at: string | null;
+  line_items: ShopifyLineItem[];
+}
+
+export interface MergeableShopifyOrder {
+  id: number;
+  name: string;
+  items: OrderItem[];
+}
+
+/**
+ * Find a still-open, UNPAID, unfulfilled order for the customer (by phone),
+ * placed since `sinceISO` — across ALL of the shop's orders, not just ours.
+ * Paid/refunded/authorized orders are skipped so we never trigger a refund.
+ */
+export async function findMergeableShopifyOrder(
   shop: string,
   accessToken: string,
-  orderId: string | number,
-): Promise<ShopifyOrderStatus | null> {
+  phone: string,
+  sinceISO: string,
+): Promise<MergeableShopifyOrder | null> {
+  const customer = await findCustomerByPhone(shop, accessToken, phone);
+  if (!customer) return null;
+
   const res = await shopifyAdminFetch(
     shop,
     accessToken,
-    `/orders/${orderId}.json?fields=id,cancelled_at,fulfillment_status`,
+    `/orders.json?customer_id=${customer.id}&status=open&created_at_min=${encodeURIComponent(
+      sinceISO,
+    )}&fields=id,name,created_at,financial_status,fulfillment_status,cancelled_at,line_items&limit=20`,
   );
   if (!res.ok) return null;
-  const data = (await res.json()) as { order?: ShopifyOrderStatus };
-  return data.order ?? null;
+
+  const data = (await res.json()) as { orders?: ShopifyOrderFull[] };
+  const orders = (data.orders ?? [])
+    .slice()
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+  for (const o of orders) {
+    if (o.cancelled_at) continue;
+    if (o.fulfillment_status != null) continue; // already (partly) shipped
+    if (NON_MERGEABLE_FINANCIAL.has((o.financial_status ?? "").toLowerCase())) {
+      continue; // paid / refunded / authorized → don't touch
+    }
+    const lines = o.line_items ?? [];
+    if (lines.length === 0) continue;
+    // Only merge if every line can be reconstructed (has a variant).
+    if (!lines.every((li) => li.variant_id != null)) continue;
+
+    const items: OrderItem[] = lines.map((li) => ({
+      variant_id: li.variant_id as number,
+      title: li.title || li.name || "Producto",
+      quantity: li.quantity,
+      price: Number(li.price),
+    }));
+    return { id: o.id, name: o.name, items };
+  }
+  return null;
 }
 
 /** Cancel an order (restocking inventory). Used when merging pending orders. */
