@@ -94,6 +94,8 @@ export async function getAnalytics(days = 30): Promise<AnalyticsData> {
       supabase
         .from("orders")
         .select("total, currency, phone, created_at, items_json, store_id")
+        .neq("status", "merged")
+        .neq("status", "cancelled")
         .gte("created_at", prevISO),
       supabase.from("stores").select("id, shopify_domain"),
     ]);
@@ -302,6 +304,8 @@ export async function getRetentionCohorts(): Promise<RetentionData> {
   const { data } = await supabase
     .from("orders")
     .select("phone, created_at")
+    .neq("status", "merged")
+    .neq("status", "cancelled")
     .gte("created_at", since.toISOString());
 
   return buildRetentionMatrix(

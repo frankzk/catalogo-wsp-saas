@@ -64,6 +64,7 @@ create table if not exists public.orders (
   id              uuid primary key default gen_random_uuid(),
   store_id        uuid not null references public.stores (id) on delete cascade,
   shopify_order_id text,
+  status          text not null default 'pending',    -- pending | merged | cancelled
   name            text,
   phone           text,
   total           numeric(12,2),
@@ -197,3 +198,8 @@ create policy events_select_own on public.events
 -- Freemium model: every merchant starts on the Free plan.
 alter table public.merchants alter column plan set default 'free';
 update public.merchants set plan = 'free' where plan is null;
+
+-- Order merging: track lifecycle so merged/cancelled orders are excluded from
+-- counts, metrics and the monthly cap.
+alter table public.orders add column if not exists status text not null default 'pending';
+create index if not exists orders_store_status_idx on public.orders (store_id, status);

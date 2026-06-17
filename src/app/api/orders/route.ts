@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   let query = supabase
     .from("orders")
     .select("*")
+    .neq("status", "merged")
+    .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

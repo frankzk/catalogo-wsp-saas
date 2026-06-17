@@ -260,6 +260,46 @@ export async function findCustomerByPhone(
   return data.customers?.[0] ?? null;
 }
 
+export interface ShopifyOrderStatus {
+  id: number;
+  cancelled_at: string | null;
+  fulfillment_status: string | null; // null = unfulfilled
+}
+
+/** Fetch minimal order status to decide if it can still be merged/cancelled. */
+export async function getOrder(
+  shop: string,
+  accessToken: string,
+  orderId: string | number,
+): Promise<ShopifyOrderStatus | null> {
+  const res = await shopifyAdminFetch(
+    shop,
+    accessToken,
+    `/orders/${orderId}.json?fields=id,cancelled_at,fulfillment_status`,
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { order?: ShopifyOrderStatus };
+  return data.order ?? null;
+}
+
+/** Cancel an order (restocking inventory). Used when merging pending orders. */
+export async function cancelOrder(
+  shop: string,
+  accessToken: string,
+  orderId: string | number,
+): Promise<boolean> {
+  const res = await shopifyAdminFetch(
+    shop,
+    accessToken,
+    `/orders/${orderId}/cancel.json`,
+    {
+      method: "POST",
+      body: JSON.stringify({ restock: true, reason: "other", email: false }),
+    },
+  );
+  return res.ok;
+}
+
 export interface CreateOrderInput {
   lineItems: { variant_id: number; quantity: number; price: string }[];
   phone: string;

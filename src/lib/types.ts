@@ -48,10 +48,13 @@ export interface TrustBadge {
   text: string;
 }
 
+export type OrderStatus = "pending" | "merged" | "cancelled";
+
 export interface Order {
   id: string;
   store_id: string;
   shopify_order_id: string | null;
+  status: OrderStatus;
   name: string | null;
   phone: string | null;
   total: number | null;

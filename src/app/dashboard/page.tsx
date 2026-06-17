@@ -32,6 +32,8 @@ async function getOrdersThisMonth(): Promise<number> {
   const { count } = await supabase
     .from("orders")
     .select("id", { count: "exact", head: true })
+    .neq("status", "merged")
+    .neq("status", "cancelled")
     .gte("created_at", start.toISOString());
   return count ?? 0;
 }
